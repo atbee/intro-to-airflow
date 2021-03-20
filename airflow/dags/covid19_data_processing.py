@@ -45,6 +45,11 @@ with DAG("convid19_data_processing",
 
     start = DummyOperator(task_id="start")
 
+    print_prev_ds = BashOperator(
+        task_id="print_prev_ds",
+        bash_command="echo {{ prev_ds }}",
+    )
+
     check_api = HttpSensor(
         task_id="check_api",
         endpoint="world",
@@ -87,7 +92,6 @@ with DAG("convid19_data_processing",
 
     end = DummyOperator(task_id="end")
 
-    start >> check_api >> download_covid19_data \
-        >> create_table >> load_data_to_db >> send_mail \
-        >> end
+    start >> print_prev_ds >> check_api >> download_covid19_data \
+        >> create_table >> load_data_to_db >> send_mail >> end
     download_covid19_data >> load_data_to_s3
