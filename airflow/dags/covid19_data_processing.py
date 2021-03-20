@@ -6,6 +6,7 @@ from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.email import EmailOperator
 from airflow.operators.python import PythonOperator
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.sqlite.operators.sqlite import SqliteOperator
 from airflow.utils import timezone
 
@@ -22,6 +23,15 @@ def _download_covid19_data():
         logging.info("Save COVID-19 data to CSV file successfully")
 
     return data
+
+def _load_data_to_s3():
+    hook = S3Hook(aws_conn_id="aws_s3_conn")
+    hook.load_file(
+        filename="/Users/atb/covid19.csv",
+        key="atb/covid19.csv",
+        bucket_name="odds-dataops",
+        replace=True,
+    )
 
 default_args = {
     "owner": "atb",
@@ -64,7 +74,13 @@ with DAG("convid19_data_processing",
         html_content="Yeah!",
     )
 
+    load_data_to_s3 = PythonOperator(
+        task_id="load_data_to_s3",
+        python_callable=_load_data_to_s3,
+    )
+
     end = DummyOperator(task_id="end")
 
-    start >> download_covid19_data >> create_table
-    create_table >> load_data_to_db >> send_mail >> end
+    start >> download_covid19_data >> create_table \
+        >> load_data_to_db >> send_mail >> end
+    download_covid19_data >> load_data_to_s3
