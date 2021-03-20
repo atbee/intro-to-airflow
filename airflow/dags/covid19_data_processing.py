@@ -45,7 +45,7 @@ default_args = {
     "owner": "atb",
     "email": ["atb@odds.team",]
 }
-with DAG("convid19_data_processing",
+with DAG("covid19_data_processing",
          schedule_interval="@daily",
          default_args=default_args,
          start_date=timezone.datetime(2021, 3, 1),
