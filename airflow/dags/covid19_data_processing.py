@@ -13,22 +13,30 @@ from airflow.providers.sqlite.operators.sqlite import SqliteOperator
 from airflow.utils import timezone
 
 
-def _download_covid19_data():
-    url = "https://api.covid19api.com/world?from=2021-03-01T00:00:00Z&to=2021-03-02T00:00:00Z"
+def _download_covid19_data(**kwargs):
+    ds = kwargs["ds"]
+    yesterday_ds = kwargs["yesterday_ds"]
+    # from airflow import macros
+    # yesterday_ds = macros.ds_add(ds, -1)
+
+    domain = "https://api.covid19api.com"
+    url = f"{domain}/world?from={yesterday_ds}T00:00:00Z&to={ds}T00:00:00Z"
     response = requests.get(url)
     data = response.json()
-    with open("/Users/atb/covid19.csv", "w") as csvfile:
+    with open(f"/Users/atb/covid19-{ds}.csv", "w") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([data[0]["NewConfirmed"]])
         logging.info("Save COVID-19 data to CSV file successfully")
 
     return data
 
-def _load_data_to_s3():
+def _load_data_to_s3(**kwargs):
+    ds = kwargs["ds"]
+
     hook = S3Hook(aws_conn_id="aws_s3_conn")
     hook.load_file(
-        filename="/Users/atb/covid19.csv",
-        key="atb/covid19.csv",
+        filename=f"/Users/atb/covid19-{ds}.csv",
+        key=f"atb/covid19-{ds}.csv",
         bucket_name="odds-dataops",
         replace=True,
     )
@@ -74,7 +82,7 @@ with DAG("convid19_data_processing",
     load_data_to_db = BashOperator(
         task_id="load_data_to_db",
         bash_command="""
-            sqlite3 -separator "," /Users/atb/covid19.db ".import /Users/atb/covid19.csv covid19"
+            sqlite3 -separator "," /Users/atb/covid19-{{ ds }}.db ".import /Users/atb/covid19-{{ ds }}.csv covid19"
         """
     )
 
