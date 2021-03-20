@@ -1,16 +1,16 @@
 import csv
 import logging
 
+import requests
 from airflow.models import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.email import EmailOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.providers.http.sensors.http import HttpSensor
 from airflow.providers.sqlite.operators.sqlite import SqliteOperator
 from airflow.utils import timezone
-
-import requests
 
 
 def _download_covid19_data():
@@ -44,6 +44,12 @@ with DAG("convid19_data_processing",
          tags=["covid19", "odds"]) as dag:
 
     start = DummyOperator(task_id="start")
+
+    check_api = HttpSensor(
+        task_id="check_api",
+        endpoint="world",
+        response_check=lambda response: True if len(response.json()) > 0 else False,
+    )
 
     download_covid19_data = PythonOperator(
         task_id="download_covid19_data",
@@ -81,6 +87,7 @@ with DAG("convid19_data_processing",
 
     end = DummyOperator(task_id="end")
 
-    start >> download_covid19_data >> create_table \
-        >> load_data_to_db >> send_mail >> end
+    start >> check_api >> download_covid19_data \
+        >> create_table >> load_data_to_db >> send_mail \
+        >> end
     download_covid19_data >> load_data_to_s3
