@@ -4,6 +4,7 @@ import logging
 from airflow.models import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.email import EmailOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.sqlite.operators.sqlite import SqliteOperator
 from airflow.utils import timezone
@@ -56,6 +57,14 @@ with DAG("convid19_data_processing",
         """
     )
 
+    send_mail = EmailOperator(
+        task_id="send_email",
+        to=["atb@odds.team",],
+        subject="Finished loading COVID-19 data to db!",
+        html_content="Yeah!",
+    )
+
     end = DummyOperator(task_id="end")
 
-    start >> download_covid19_data >> create_table >> load_data_to_db >> end
+    start >> download_covid19_data >> create_table
+    create_table >> load_data_to_db >> send_mail >> end
